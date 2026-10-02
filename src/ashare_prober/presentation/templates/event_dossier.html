@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>事件档案 · {{ summary.name }}（{{ summary.code }}）</title>
+<style>
+:root{
+  --up:#d70015;        /* 涨：红 */
+  --down:#008a3e;      /* 跌：绿 */
+  --neutral:#888888;   /* 中性 */
+  --bg:#f2f2f7;
+  --card:#ffffff;
+  --text:#1c1c1e;
+  --sub:#8e8e93;
+  --border:#e5e5ea;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.6;font-size:15px;
+}
+.container{max-width:760px;margin:0 auto;padding:16px 14px 56px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+.card h2 .idx{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--bg);
+  color:var(--sub);font-size:12px;align-items:center;justify-content:center;}
+.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--border);}
+.row:last-child{border-bottom:none;}
+.row .k{color:var(--sub);}
+.row .v{text-align:right;font-weight:600;}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;}
+.badge.up{background:var(--up);}
+.badge.down{background:var(--down);}
+.badge.neutral{background:var(--neutral);}
+.badge.info{background:#007aff;}
+.badge.warn{background:#ff9500;}
+.list{list-style:none;margin:0;padding:0;}
+.list li{padding:10px 0;border-bottom:1px solid var(--border);}
+.list li:last-child{border-bottom:none;}
+.tag{display:inline-block;font-size:11px;color:var(--sub);border:1px solid var(--border);
+  border-radius:6px;padding:1px 6px;margin-right:6px;}
+.evi{border-left:4px solid var(--neutral);padding:8px 12px;margin:8px 0;background:var(--bg);border-radius:0 10px 10px 0;}
+.evi.support{border-left-color:var(--down);}
+.evi.against{border-left-color:var(--up);}
+.evi .cat{font-size:12px;color:var(--sub);}
+.chain{display:flex;flex-wrap:wrap;gap:8px;}
+.chain .node{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:13px;}
+.chain .arrow{color:var(--sub);align-self:center;}
+.muted{color:var(--sub);font-size:13px;}
+.pre{white-space:pre-wrap;word-break:break-word;}
+.foot{text-align:center;color:var(--sub);font-size:12px;margin-top:8px;}
+.disclaimer{background:#fff8e6;border:1px solid #ffe2a8;color:#7a5b00;border-radius:12px;padding:12px;font-size:13px;}
+.topbtn{position:fixed;right:14px;bottom:18px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:10px 14px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ① 异动摘要卡 -->
+  <div class="card">
+    <h2><span class="idx">①</span>异动摘要</h2>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+      <span class="sym" style="font-size:22px;font-weight:700;color:
+        {% if summary.direction == 'up' %}var(--up){% elif summary.direction == 'down' %}var(--down){% else %}var(--neutral){% endif %};">
+        {{ summary.code }}
+      </span>
+      <span style="font-size:16px;">{{ summary.name }}</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      {% if summary.direction == 'up' %}
+        <span class="badge up">{{ summary.type_label }}</span>
+      {% elif summary.direction == 'down' %}
+        <span class="badge down">{{ summary.type_label }}</span>
+      {% else %}
+        <span class="badge neutral">{{ summary.type_label }}</span>
+      {% endif %}
+      {% if summary.level == 'alert' %}
+        <span class="badge up">{{ summary.level_label }}</span>
+      {% elif summary.level == 'watch' %}
+        <span class="badge warn">{{ summary.level_label }}</span>
+      {% elif summary.level == 'info' %}
+        <span class="badge info">{{ summary.level_label }}</span>
+      {% else %}
+        <span class="badge neutral">{{ summary.level_label }}</span>
+      {% endif %}
+    </div>
+    <div class="row"><span class="k">触发时间</span><span class="v">{{ summary.detected_at }}</span></div>
+    <div class="row"><span class="k">状态</span><span class="v">{{ summary.event_status_label }}</span></div>
+    <div class="row"><span class="k">档案编号</span><span class="v">{{ summary.dossier_id }}</span></div>
+    <div class="row"><span class="k">版本</span><span class="v">v{{ summary.version }}</span></div>
+  </div>
+
+  <!-- ② 前因 -->
+  <div class="card">
+    <h2><span class="idx">②</span>前因（异动发生前同期信息）</h2>
+
+    <div class="muted" style="margin:4px 0;">新闻（{{ dossier.cause.news|length }}）</div>
+    {% if dossier.cause.news %}
+      <ul class="list">
+      {% for n in dossier.cause.news %}
+        <li>
+          <div><span class="tag">{{ n.source or '新闻' }}</span>{{ n.title }}</div>
+          {% if n.summary %}<div class="muted pre">{{ n.summary }}</div>{% endif %}
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">暂无相关新闻。</div>{% endif %}
+
+    <div class="muted" style="margin:10px 0 4px;">公告（{{ dossier.cause.announcements|length }}）</div>
+    {% if dossier.cause.announcements %}
+      <ul class="list">
+      {% for a in dossier.cause.announcements %}
+        <li>
+          <div><span class="tag">{{ a.category or '公告' }}</span>{{ a.title }}</div>
+          <div class="muted">{{ a.published_at or '' }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">暂无相关公告。</div>{% endif %}
+
+    <div class="muted" style="margin:10px 0 4px;">龙虎榜</div>
+    {% if dossier.cause.dragon_tiger %}
+      {% set dt = dossier.cause.dragon_tiger %}
+      <div class="row"><span class="k">上榜原因</span><span class="v">{{ dt.reason or '—' }}</span></div>
+      <div class="row"><span class="k">净买入</span>
+        <span class="v" style="color:{% if dt.net_buy >= 0 %}var(--down){% else %}var(--up){% endif %};">
+          {{ "%.0f"|format(dt.net_buy) }} 元</span></div>
+      {% if dt.buy_seats or dt.sell_seats %}
+        <div class="muted" style="margin-top:6px;">
+          买入席位 {{ dt.buy_seats|length }} ｜ 卖出席位 {{ dt.sell_seats|length }}
+        </div>
+      {% endif %}
+    {% else %}<div class="muted">当日未上榜。</div>{% endif %}
+
+    <div class="muted" style="margin:10px 0 4px;">解禁日历（{{ dossier.cause.unlock_schedule|length }}）</div>
+    {% if dossier.cause.unlock_schedule %}
+      <ul class="list">
+      {% for u in dossier.cause.unlock_schedule %}
+        <li class="pre">{{ u }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">近期无解禁。</div>{% endif %}
+
+    <div class="muted" style="margin:10px 0 4px;">同板块联动</div>
+    {% if dossier.cause.sector_linkage %}
+      <div class="chain">
+      {% for s in dossier.cause.sector_linkage %}<span class="node">{{ s }}</span>{% endfor %}
+      </div>
+    {% else %}<div class="muted">暂无联动信息。</div>{% endif %}
+
+    <div class="muted" style="margin:10px 0 4px;">外围同期</div>
+    {% if dossier.cause.external_same_time %}
+      <ul class="list">
+      {% for e in dossier.cause.external_same_time %}
+        <li>{{ e.name }}（{{ e.category or '' }}）：{{ "%.2f"|format(e.pct_change) }}%</li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">暂无外围同期数据。</div>{% endif %}
+  </div>
+
+  <!-- ③ 后果 -->
+  <div class="card">
+    <h2><span class="idx">③</span>后果（传导与承接）</h2>
+    {% set ch = dossier.consequence.transmission_chain %}
+    <div class="muted">传导链（上游 → 中游 → 下游）</div>
+    <div class="chain" style="margin-top:6px;">
+      {% for u in ch.upstream %}<span class="node">{{ u }}</span>{% endfor %}
+      {% if ch.midstream %}<span class="arrow">→</span>{% for m in ch.midstream %}<span class="node">{{ m }}</span>{% endfor %}{% endif %}
+      {% if ch.downstream %}<span class="arrow">→</span>{% for d in ch.downstream %}<span class="node">{{ d }}</span>{% endfor %}{% endif %}
+    </div>
+    {% if not ch.upstream and not ch.midstream and not ch.downstream %}
+      <div class="muted">传导链暂未归集（占位）。</div>
+    {% endif %}
+    <div class="row"><span class="k">资金承接</span><span class="v">{{ dossier.consequence.capital_acceptance or '—' }}</span></div>
+    <div class="row"><span class="k">历史相似</span><span class="v">{{ dossier.consequence.historical_similar or '—' }}</span></div>
+  </div>
+
+  <!-- ④ 证据支持/反证双栏 -->
+  <div class="card">
+    <h2><span class="idx">④</span>证据（支持 / 反证）</h2>
+    {% if dossier.evidences %}
+      {% for ev in dossier.evidences %}
+        <div class="evi {% if ev.supports %}support{% else %}against{% endif %}">
+          <div class="cat">
+            [{{ "支持" if ev.supports else "反证" }}] {{ ev.category or '' }} ｜ 来源：{{ ev.source or '—' }} ｜ 权重：{{ "%.2f"|format(ev.weight) }}
+          </div>
+          <div class="pre">{{ ev.content }}</div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="muted">暂无证据归集（占位）。</div>
+    {% endif %}
+  </div>
+
+  <!-- ⑤ 研判 -->
+  <div class="card">
+    <h2><span class="idx">⑤</span>多视角研判</h2>
+    {% if report %}
+      <div class="muted">持有方视角（bull）</div>
+      <div class="pre" style="margin:4px 0 12px;">{{ report.bull_view }}</div>
+      <div class="muted">旁观方视角（bear）</div>
+      <div class="pre" style="margin:4px 0 12px;">{{ report.bear_view }}</div>
+      <div class="row"><span class="k">置信度</span>
+        <span class="v">{{ "%.0f"|format(report.confidence * 100) }}%</span></div>
+      <div class="row"><span class="k">综合结论</span><span class="v" style="font-weight:600;">{{ report.conclusion }}</span></div>
+    {% else %}
+      <div class="muted">尚未生成研判报告。</div>
+    {% endif %}
+  </div>
+
+  <!-- ⑥ 审批状态角标 + 免责声明 -->
+  <div class="card">
+    <h2><span class="idx">⑥</span>审批状态</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>当前状态</strong>
+      {% if summary.status == 'approved' %}
+        <span class="badge down">{{ summary.status_label }}</span>
+      {% elif summary.status == 'rejected' %}
+        <span class="badge up">{{ summary.status_label }}</span>
+      {% else %}
+        <span class="badge neutral">{{ summary.status_label }}</span>
+      {% endif %}
+    </div>
+    {% if approval and summary.status != 'pending' %}
+      <div class="muted" style="margin-top:8px;">
+        审批人：{{ approval.approver or '—' }} ｜ 意见：{{ approval.decision_note or '—' }}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="disclaimer">
+    ⚠️ 免责声明：本页面由系统基于公开数据自动归集生成，<b>仅辅助研判、不荐股、不自动交易</b>。
+    所有结论须由人工审批后参考，据此操作风险自担。
+  </div>
+
+  <div class="foot">生成时间：<span id="gen-time">—</span> ｜ 档案编号 {{ summary.dossier_id }}</div>
+</div>
+
+<button class="topbtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">回到顶部</button>
+<script>
+  try { document.getElementById('gen-time').textContent = new Date().toLocaleString(); } catch (e) {}
+</script>
+</body>
+</html>

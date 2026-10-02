@@ -1,0 +1,46 @@
+# A-Share Anomaly Prober 配置样例
+#
+# 复制本文件为 config.toml 后填入真实值：
+#   cp config.example.toml config.toml
+#
+# 注意：config.toml 已被 .gitignore 忽略，请勿提交真实密钥。
+
+# ---- 本地存储路径（留空则使用项目根 data/ 与 data/prober.db）----
+# data_dir = "data"
+# db_path  = "data/prober.db"
+
+# ---- LLM 研判客户端（OpenAI 兼容，如 DeepSeek）----
+[llm]
+base_url   = "https://api.deepseek.com/v1"   # OpenAI 兼容基址
+api_key    = ""                               # 必填：你的 API Key
+model      = "deepseek-chat"                  # 模型名
+temperature = 0.3                             # 低温度，抑制幻觉
+max_tokens  = 2048                            # 单次输出上限（成本保护）
+timeout     = 30.0                            # 请求超时（秒）
+
+# ---- 推送通道（企业微信 / 飞书 webhook）----
+[push]
+enabled        = true                         # 推送总开关；false 时不装配任何通道
+wecom_webhook  = ""                           # 企业微信群机器人 Webhook 地址
+feishu_webhook = ""                           # 飞书自定义机器人 Webhook 地址
+feishu_secret  = ""                           # 飞书签名密钥；留空则不签名
+timeout        = 10.0                         # 单次推送 HTTP 超时（秒）
+# 说明：两个 webhook 都留空时，PushManager 不装配任何通道，
+#       `prober push` 会提示未配置并安全退出（不会静默失败）。
+
+# ---- 自选标的兜底列表（仅在数据库名单为空时生效）----
+[watchlist]
+# 此处仅为数据库名单为空时的兜底；正式管理请运行 `prober serve` 在看板页增删，
+# 或用 CLI `prober watchlist`。数据库（user_watchlist 表）名单非空时，
+# 本段配置将被忽略，以数据库为唯一真源。
+symbols = []  # 兜底 A 股代码列表；数据库名单为空且此处留空则不扫描任何标的
+
+# ---- 定时调度（prober schedule / 常驻服务）----
+[schedule]
+enabled           = true      # 调度总开关；false 时定时服务不触发任何作业
+scan_time         = "15:05"   # 收盘后扫描时刻（HH:MM，北京时间）
+am_scan_time      = ""        # 早盘扫描时刻（HH:MM）；留空表示不做早盘扫描
+push              = true      # 扫描后是否推送异动事件
+refresh_dashboard = true      # 扫描后是否刷新大盘看板（outputs/index.html 默认页）
+# 说明：时刻字符串必须为合法 HH:MM（如 "15:05"），非法值会回退默认值 15:05；
+#       定时服务依赖 apscheduler（pip install apscheduler），未安装时仍可用 --once 手动执行。

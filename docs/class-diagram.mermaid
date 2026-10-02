@@ -1,0 +1,183 @@
+classDiagram
+    %% ===== 数据层模型 =====
+    class Quote {
+        +str symbol
+        +str name
+        +date date
+        +float open
+        +float high
+        +float low
+        +float close
+        +float pre_close
+        +float volume
+        +float amount
+        +float pct_change
+    }
+    class MoneyFlow {
+        +str code
+        +str name
+        +date date
+        +float main_net_inflow
+        +float retail_net_inflow
+        +int rank
+    }
+    class NewsItem {
+        +str id
+        +str source
+        +str title
+        +str url
+        +datetime published_at
+        +str summary
+        +list~str~ symbols
+    }
+    class Announcement {
+        +str id
+        +str stock_code
+        +str title
+        +datetime published_at
+        +str category
+        +str url
+    }
+    class DragonTiger {
+        +str stock_code
+        +date date
+        +str reason
+        +list~Seat~ buy_seats
+        +list~Seat~ sell_seats
+        +float net_buy
+    }
+    class Seat {
+        +str name
+        +float amount
+        +str side
+    }
+    class LimitPoolItem {
+        +str stock_code
+        +str name
+        +float price
+        +float pct_change
+        +str reason
+        +int consecutive_boards
+        +date date
+    }
+    class ExternalQuote {
+        +str name
+        +str category
+        +datetime timestamp
+        +float last
+        +float pct_change
+    }
+
+    %% ===== 异动 / 归因 / 研判 模型 =====
+    class AnomalyEvent {
+        +str id
+        +str scope
+        +str ref_code
+        +str ref_name
+        +str type
+        +str level
+        +datetime detected_at
+        +str status
+        +str rule_id
+        +str meta_status
+    }
+    class EventDossier {
+        +str id
+        +str anomaly_event_id
+        +int version
+        +datetime created_at
+        +CauseBlock cause
+        +ConsequenceBlock consequence
+        +list~Evidence~ evidences
+        +list~SimilarCase~ similar_cases
+    }
+    class CauseBlock {
+        +list~NewsItem~ news
+        +list~Announcement~ announcements
+        +DragonTiger dragon_tiger
+        +list~dict~ unlock_schedule
+        +list~str~ sector_linkage
+        +list~ExternalQuote~ external_same_time
+    }
+    class ConsequenceBlock {
+        +TransmissionChain transmission_chain
+        +str capital_acceptance
+        +str historical_similar
+    }
+    class TransmissionChain {
+        +list~str~ upstream
+        +list~str~ midstream
+        +list~str~ downstream
+    }
+    class Evidence {
+        +str id
+        +str category
+        +str content
+        +bool supports
+        +str source
+        +float weight
+    }
+    class SimilarCase {
+        +date date
+        +str symbol
+        +str pattern
+        +str outcome
+    }
+    class ResearchReport {
+        +str id
+        +str dossier_id
+        +str bull_view
+        +str bear_view
+        +float confidence
+        +str conclusion
+        +datetime created_at
+        +str model
+    }
+    class ApprovalRequest {
+        +str id
+        +str report_id
+        +str status
+        +datetime created_at
+        +datetime decided_at
+        +str decision_note
+        +str approver
+    }
+
+    %% ===== 数据源抽象 =====
+    class DataSource {
+        <<interface>>
+        +fetch_quote(symbol) Quote
+        +fetch_news(symbol) list~NewsItem~
+        +fetch_announcements(symbol) list~Announcement~
+    }
+    class AkShareSource {
+        +fetch_quote(symbol) Quote
+    }
+    class BackupSource {
+        +fetch_quote(symbol) Quote
+    }
+    class Provider {
+        +get_quote(symbol) Quote
+        +get_news(symbol) list~NewsItem~
+    }
+
+    %% ===== 关系 =====
+    DataSource <|-- AkShareSource
+    DataSource <|-- BackupSource
+    Provider --> DataSource
+    Provider --> Quote
+
+    AnomalyEvent "1" --> "1" EventDossier : produces
+    EventDossier "1" *-- "1" CauseBlock
+    EventDossier "1" *-- "1" ConsequenceBlock
+    EventDossier "1" *-- "0..*" Evidence
+    EventDossier "1" *-- "0..*" SimilarCase
+    CauseBlock "1" *-- "0..*" NewsItem
+    CauseBlock "1" *-- "0..*" Announcement
+    CauseBlock "1" *-- "0..*" ExternalQuote
+    CauseBlock "1" *-- "1" DragonTiger
+    ConsequenceBlock "1" *-- "1" TransmissionChain
+    DragonTiger "1" *-- "0..*" Seat
+
+    ResearchReport "0..*" --> "1" EventDossier : analyzes
+    ApprovalRequest "1" --> "1" ResearchReport : gates

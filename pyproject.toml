@@ -1,0 +1,55 @@
+[project]
+name = "ashare-anomaly-prober"
+version = "0.1.0"
+description = "面向 A 股的异动「前因后果」探测与多视角研判开源工具"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "WekiLee", url = "https://github.com/WekiLee" }]
+keywords = ["akshare", "a-share", "anomaly", "quant", "llm", "research"]
+dependencies = [
+    # ⚠️ 版本锁定纪律：akshare 函数名随版本剧烈变动（1.18.84 实证多处更名），
+    # 上界锁 <1.19；升级前必读 README「版本锁定与升级注意事项」
+    "akshare>=1.18.84,<1.19", # 主数据源
+    "httpx>=0.27",            # 异步 HTTP（备用源直连 / LLM / webhook）
+    "openai>=1.0",            # OpenAI 兼容 LLM 客户端（DeepSeek 等）
+    "pydantic>=2.7",          # 数据模型与校验
+    "pydantic-settings>=2.3", # 配置管理
+    "apscheduler>=3.10",      # 定时采集调度
+    "jinja2>=3.1",            # HTML 模板渲染
+    "typer>=0.12",            # CLI 入口
+    "rich>=13.7",             # 终端美化输出
+    "structlog>=24.1",        # 结构化日志
+    # 本地库：默认使用 Python 标准库 sqlite3；DuckDB 为可选分析型查询后端
+    "duckdb>=1.0; python_version>='3.12'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+prober = "ashare_prober.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ashare_prober"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+ignore_missing_imports = true

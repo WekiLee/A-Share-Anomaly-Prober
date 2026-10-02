@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>大盘看板 · {{ meta.date_text }}</title>
+<style>
+:root{
+  --up:{{ colors.up }};        /* 涨：红 */
+  --down:{{ colors.down }};    /* 跌：绿 */
+  --neutral:{{ colors.neutral }}; /* 中性 */
+  --bg:#f2f2f7;
+  --card:#ffffff;
+  --text:#1c1c1e;
+  --sub:#8e8e93;
+  --border:#e5e5ea;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.6;font-size:15px;
+}
+.container{max-width:760px;margin:0 auto;padding:16px 14px 56px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+.card h2 .idx{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--bg);
+  color:var(--sub);font-size:12px;align-items:center;justify-content:center;}
+.muted{color:var(--sub);font-size:13px;}
+.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--border);}
+.row:last-child{border-bottom:none;}
+.row .k{color:var(--sub);}
+.row .v{text-align:right;font-weight:600;}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;}
+.badge.up{background:var(--up);}
+.badge.down{background:var(--down);}
+.badge.neutral{background:var(--neutral);}
+.tag{display:inline-block;font-size:11px;color:var(--sub);border:1px solid var(--border);
+  border-radius:6px;padding:1px 6px;margin-right:6px;}
+.list{list-style:none;margin:0;padding:0;}
+.list li{padding:10px 0;border-bottom:1px solid var(--border);}
+.list li:last-child{border-bottom:none;}
+.foot{text-align:center;color:var(--sub);font-size:12px;margin-top:8px;}
+.disclaimer{background:#fff8e6;border:1px solid #ffe2a8;color:#7a5b00;border-radius:12px;padding:12px;font-size:13px;}
+.topbtn{position:fixed;right:14px;bottom:18px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:10px 14px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+
+/* 页首 */
+.hero{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.hero .title{font-size:22px;font-weight:700;}
+.hero .date{font-size:15px;color:var(--sub);}
+
+/* 缺口提示区（诚实性纪律：缺失必须显眼） */
+.gaps{background:#fff4f4;border:1px solid #ffc9c9;border-radius:12px;padding:12px;margin-top:12px;}
+.gaps .ghead{font-weight:700;color:#b00020;font-size:14px;margin-bottom:6px;}
+.gaps ul{margin:0;padding-left:18px;}
+.gaps li{font-size:13px;color:#7a1f1f;}
+
+/* 指数网格 */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.idx-card{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fafafc;}
+.idx-card .nm{font-size:13px;color:var(--sub);}
+.idx-card .pt{font-size:20px;font-weight:700;line-height:1.25;}
+.idx-card .pct{font-size:13px;font-weight:600;}
+.idx-card .amt{font-size:12px;color:var(--sub);}
+.up{color:var(--up);}
+.down{color:var(--down);}
+.neutral{color:var(--neutral);}
+
+/* 市场宽度条 */
+.bar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:var(--border);margin:8px 0 6px;}
+.bar span{display:block;height:100%;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;}
+
+/* 板块资金流横向条形 */
+.flow{margin-bottom:8px;}
+.flow .fl-top{display:flex;justify-content:space-between;gap:8px;font-size:13px;}
+.flow .fl-name{font-weight:600;}
+.flow .fl-bar{margin-top:4px;height:10px;border-radius:999px;background:var(--border);overflow:hidden;}
+.flow .fl-bar i{display:block;height:100%;border-radius:999px;background:var(--up);}
+.flow.outflow .fl-bar i{background:var(--down);}
+
+/* 监控列表（交互模式由行内 JS 启用；静态模式只读降级） */
+.wl-add{display:none;gap:8px;margin:4px 0 10px;}
+.wl-add input{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;
+  padding:8px 10px;font-size:14px;background:#fafafc;color:var(--text);outline:none;}
+.wl-add input:focus{border-color:var(--sub);}
+.wl-add button{border:none;border-radius:10px;padding:8px 16px;font-size:14px;font-weight:600;
+  background:var(--text);color:#fff;}
+.wl-btn{border:1px solid var(--border);background:#fafafc;color:var(--text);
+  border-radius:8px;padding:3px 10px;font-size:12px;}
+.wl-btn.danger{color:var(--up);border-color:var(--up);}
+.wl-line{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.wl-ops{display:flex;gap:6px;}
+.wl-cands{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;}
+.wl-cand{border:1px solid var(--border);background:#fafafc;color:var(--text);
+  border-radius:999px;padding:3px 10px;font-size:12px;}
+.wl-msg{color:var(--up);font-size:12px;min-height:1em;}
+
+/* 设置卡片（交互模式由行内 JS 启用；静态模式只读降级） */
+.cfg-card summary{cursor:pointer;font-weight:700;font-size:16px;
+  display:flex;align-items:center;gap:8px;list-style:none;}
+.cfg-card summary::-webkit-details-marker{display:none;}
+.cfg-static .row{border-bottom:1px dashed var(--border);}
+.cfg-form{display:none;margin-top:4px;}
+.cfg-sec h3{font-size:14px;margin:12px 0 4px;}
+.cfg-field{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap;}
+.cfg-field label{flex:0 0 104px;color:var(--sub);font-size:13px;}
+.cfg-field input{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;
+  padding:8px 10px;font-size:14px;background:#fafafc;color:var(--text);outline:none;}
+.cfg-field input:focus{border-color:var(--sub);}
+.cfg-check{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px;color:var(--sub);}
+.cfg-check input{width:16px;height:16px;accent-color:var(--text);}
+.cfg-ops{display:flex;gap:8px;margin:10px 0 2px;}
+.cfg-ops button{border:none;border-radius:10px;padding:8px 16px;font-size:14px;font-weight:600;
+  background:var(--text);color:#fff;}
+.cfg-ops button.ghost{background:#fafafc;color:var(--text);border:1px solid var(--border);font-weight:500;}
+.cfg-msg{color:var(--up);font-size:12px;min-height:1em;margin-top:6px;word-break:break-all;}
+.cfg-note{color:var(--sub);font-size:12px;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 页首：日期 / 更新时间 / 缺口提示 -->
+  <div class="card">
+    <div class="hero">
+      <span class="title">大盘看板</span>
+      <span class="date">{{ meta.date_text }}</span>
+    </div>
+    <div class="row"><span class="k">更新时间</span><span class="v">{{ meta.updated_text }}</span></div>
+    <div class="row"><span class="k">两市成交额</span><span class="v">{{ meta.total_amount_text }}元</span></div>
+
+    {% if meta.has_gaps %}
+      <div class="gaps">
+        <div class="ghead">⚠️ 数据缺口（{{ meta.gaps|length }}）</div>
+        <ul>
+        {% for g in meta.gaps %}
+          <li>{{ g }}</li>
+        {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ① 指数行情 -->
+  <div class="card">
+    <h2><span class="idx">①</span>指数行情</h2>
+    {% if indices %}
+      <div class="grid">
+      {% for it in indices %}
+        <div class="idx-card">
+          <div class="nm">{{ it.name }} <span class="tag">{{ it.code }}</span></div>
+          <div class="pt {{ it.direction }}">{{ it.last_text }}</div>
+          <div class="pct {{ it.direction }}">{{ it.pct_text }}
+            <span class="muted">({{ it.change_text }})</span></div>
+          <div class="amt">成交额 {{ it.amount_text }}元</div>
+        </div>
+      {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">指数行情暂不可用（见页首缺口提示）。</div>
+    {% endif %}
+  </div>
+
+  <!-- ② 市场宽度 -->
+  <div class="card">
+    <h2><span class="idx">②</span>市场宽度（涨跌家数）</h2>
+    {% if breadth %}
+      <div class="bar">
+        <span class="up-bg" style="width:{{ breadth.up_pct }}%;background:var(--up);"></span>
+        <span style="width:{{ breadth.flat_pct }}%;background:var(--neutral);"></span>
+        <span style="width:{{ breadth.down_pct }}%;background:var(--down);"></span>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--up);"></i>上涨 {{ breadth.up_count }}</span>
+        <span><i style="background:var(--neutral);"></i>平盘 {{ breadth.flat_count }}</span>
+        <span><i style="background:var(--down);"></i>下跌 {{ breadth.down_count }}</span>
+        <span>上涨占比 {{ breadth.up_ratio_text }}</span>
+      </div>
+      <div class="row"><span class="k">统计样本</span><span class="v">{{ breadth.total }} 只</span></div>
+      <div class="row"><span class="k">涨停 / 跌停</span>
+        <span class="v"><span class="up">{{ breadth.limit_up_count }}</span> / <span class="down">{{ breadth.limit_down_count }}</span></span></div>
+    {% else %}
+      <div class="muted">市场宽度暂不可用（见页首缺口提示）。</div>
+    {% endif %}
+  </div>
+
+  <!-- ③ 板块资金流 -->
+  <div class="card">
+    <h2><span class="idx">③</span>板块资金流（主力净流入，亿元）</h2>
+
+    <div class="muted" style="margin:4px 0;">净流入 TOP {{ sectors_top|length }}</div>
+    {% if sectors_top %}
+      {% for s in sectors_top %}
+        <div class="flow">
+          <div class="fl-top">
+            <span class="fl-name">{{ s.rank }}. {{ s.name }}</span>
+            <span class="up">{{ s.inflow_text }}</span>
+          </div>
+          <div class="fl-bar"><i style="width:{{ s.bar_width }}%;"></i></div>
+          <div class="muted">板块涨跌 {{ s.pct_text }}</div>
+        </div>
+      {% endfor %}
+    {% else %}<div class="muted">暂无板块资金流数据（见页首缺口提示）。</div>{% endif %}
+
+    <div class="muted" style="margin:14px 0 4px;">净流出 TOP {{ sectors_bottom|length }}</div>
+    {% if sectors_bottom %}
+      {% for s in sectors_bottom %}
+        <div class="flow outflow">
+          <div class="fl-top">
+            <span class="fl-name">{{ s.rank }}. {{ s.name }}</span>
+            <span class="down">{{ s.inflow_text }}</span>
+          </div>
+          <div class="fl-bar"><i style="width:{{ s.bar_width }}%;"></i></div>
+          <div class="muted">板块涨跌 {{ s.pct_text }}</div>
+        </div>
+      {% endfor %}
+    {% else %}<div class="muted">暂无板块资金流数据（见页首缺口提示）。</div>{% endif %}
+  </div>
+
+  <!-- ④ 涨跌停 -->
+  <div class="card">
+    <h2><span class="idx">④</span>涨跌停</h2>
+    <div class="row"><span class="k">涨停家数</span><span class="v up">{{ limit_up|length }}</span></div>
+    <div class="row"><span class="k">跌停家数</span><span class="v down">{{ limit_down|length }}</span></div>
+
+    <div class="muted" style="margin:10px 0 4px;">涨停明细</div>
+    {% if limit_up %}
+      <ul class="list">
+      {% for it in limit_up %}
+        <li>
+          <div><span class="tag">{{ it.code }}</span>{{ it.name }}
+            <span class="up">{{ it.pct_text }}</span></div>
+          <div class="muted">{{ it.price_text }} 元 ｜ {{ it.boards_text }} ｜ {{ it.reason }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">今日无涨停数据（见页首缺口提示）。</div>{% endif %}
+
+    <div class="muted" style="margin:14px 0 4px;">跌停明细</div>
+    {% if limit_down %}
+      <ul class="list">
+      {% for it in limit_down %}
+        <li>
+          <div><span class="tag">{{ it.code }}</span>{{ it.name }}
+            <span class="down">{{ it.pct_text }}</span></div>
+          <div class="muted">{{ it.price_text }} 元 ｜ {{ it.reason }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}<div class="muted">今日无跌停数据（见页首缺口提示）。</div>{% endif %}
+  </div>
+
+  <!-- ⑤ 外围行情 -->
+  <div class="card">
+    <h2><span class="idx">⑤</span>外围行情</h2>
+    {% if external %}
+      <ul class="list">
+      {% for e in external %}
+        <li>
+          <div style="display:flex;justify-content:space-between;gap:8px;">
+            <span><span class="tag">{{ e.category or '外围' }}</span>{{ e.name }}</span>
+            <span class="{{ e.direction }}" style="font-weight:600;">{{ e.pct_text }}</span>
+          </div>
+          <div class="muted">{{ e.last_text }} ｜ {{ e.time_text }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">外围行情暂不可用（见页首缺口提示）。</div>
+    {% endif %}
+  </div>
+
+  <!-- ⑥ 近期异动 -->
+  <div class="card">
+    <h2><span class="idx">⑥</span>近期异动</h2>
+    {% if recent_events %}
+      <ul class="list">
+      {% for ev in recent_events %}
+        <li>
+          <div><span class="tag">{{ ev.code }}</span>{{ ev.name }}
+            <span class="badge {% if ev.level == 'alert' %}up{% elif ev.level == 'watch' %}neutral{% else %}neutral{% endif %}">{{ ev.level_label }}</span>
+          </div>
+          <div class="muted">{{ ev.type_label }} ｜ {{ ev.detected_text }} ｜ {{ ev.id }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div class="muted">今日暂无异动。</div>
+    {% endif %}
+  </div>
+
+  <!-- ⑦ 监控列表 -->
+  <div class="card">
+    <h2><span class="idx">⑦</span>监控列表</h2>
+    <div class="wl-add" id="wl-add-bar">
+      <input id="wl-input" type="text" inputmode="search"
+        placeholder="名称 / 简称 / 代码，如 茅台 或 600519">
+      <button id="wl-add-btn" type="button">添加</button>
+    </div>
+    <div class="wl-cands" id="wl-cands"></div>
+    <div class="wl-msg" id="wl-msg"></div>
+    <ul class="list" id="wl-list">
+    {% for w in watchlist %}
+      <li data-code="{{ w.code }}">
+        <div class="wl-line">
+          <span><span class="tag">{{ w.code }}</span>{{ w.name or w.code }}
+            {% if w.active %}<span class="badge up">监控中</span>
+            {% else %}<span class="badge neutral">已暂停</span>{% endif %}
+          </span>
+        </div>
+      </li>
+    {% endfor %}
+    </ul>
+    {% if not watchlist %}
+      <div class="muted" id="wl-empty">名单为空，添加第一只票开始监控</div>
+    {% endif %}
+    <div class="muted" id="wl-static-note" style="display:none;">
+      静态模式为只读；运行 prober serve 后可在本页增删
+    </div>
+  </div>
+
+  <!-- ⑧ 设置：LLM / 推送 / 调度（运行时自助配置，改完即生效） -->
+  <details class="card cfg-card" id="cfg-card">
+    <summary>⚙️ 设置（LLM / 推送 / 调度）</summary>
+
+    <!-- 静态摘要（file:// 打开也有内容；交互模式下由 JS 隐藏） -->
+    <div class="cfg-static" id="cfg-static">
+      <div class="row"><span class="k">LLM 研判</span>
+        <span class="v">deepseek-chat · temperature 0.3 · api_key 未配置</span></div>
+      <div class="row"><span class="k">推送通道</span>
+        <span class="v">已启用 · webhook 未配置</span></div>
+      <div class="row"><span class="k">定时调度</span>
+        <span class="v">已启用 · 每日 15:05 扫描</span></div>
+    </div>
+
+    <!-- LLM 研判 -->
+    <form class="cfg-form" id="cfg-form-llm" data-section="llm" autocomplete="off"
+      onsubmit="return false;">
+      <div class="cfg-sec"><h3>LLM 研判</h3></div>
+      <div class="cfg-field"><label>Base URL</label>
+        <input type="text" data-field="base_url" autocomplete="off"
+          placeholder="https://api.deepseek.com/v1"></div>
+      <div class="cfg-field"><label>API Key</label>
+        <input type="password" data-field="api_key" data-secret="1" autocomplete="off"
+          placeholder="未配置"></div>
+      <div class="cfg-field"><label>模型</label>
+        <input type="text" data-field="model" autocomplete="off" placeholder="deepseek-chat"></div>
+      <div class="cfg-field"><label>Temperature</label>
+        <input type="number" step="0.1" min="0" max="2" data-field="temperature"
+          data-type="number" autocomplete="off" placeholder="0.3"></div>
+      <div class="cfg-ops">
+        <button type="button" class="cfg-save" data-section="llm">保存</button>
+        <button type="button" class="cfg-reset ghost" data-section="llm">恢复默认</button>
+      </div>
+    </form>
+
+    <!-- 推送通道 -->
+    <form class="cfg-form" id="cfg-form-push" data-section="push" autocomplete="off"
+      onsubmit="return false;">
+      <div class="cfg-sec"><h3>推送通道</h3></div>
+      <div class="cfg-field"><label>企业微信</label>
+        <input type="text" data-field="wecom_webhook" data-secret="1" autocomplete="off"
+          placeholder="未配置"></div>
+      <div class="cfg-field"><label>飞书 Webhook</label>
+        <input type="text" data-field="feishu_webhook" data-secret="1" autocomplete="off"
+          placeholder="未配置"></div>
+      <div class="cfg-field"><label>飞书密钥</label>
+        <input type="password" data-field="feishu_secret" data-secret="1" autocomplete="off"
+          placeholder="未配置"></div>
+      <label class="cfg-check"><input type="checkbox" data-field="enabled"> 启用推送</label>
+      <div class="cfg-ops">
+        <button type="button" class="cfg-save" data-section="push">保存</button>
+        <button type="button" class="cfg-reset ghost" data-section="push">恢复默认</button>
+      </div>
+    </form>
+
+    <!-- 定时调度 -->
+    <form class="cfg-form" id="cfg-form-schedule" data-section="schedule" autocomplete="off"
+      onsubmit="return false;">
+      <div class="cfg-sec"><h3>定时调度</h3></div>
+      <div class="cfg-field"><label>收盘扫描</label>
+        <input type="time" data-field="scan_time" autocomplete="off" placeholder="15:05"></div>
+      <div class="cfg-field"><label>早盘扫描</label>
+        <input type="time" data-field="am_scan_time" autocomplete="off" placeholder="留空不扫描"></div>
+      <label class="cfg-check"><input type="checkbox" data-field="enabled"> 启用调度</label>
+      <label class="cfg-check"><input type="checkbox" data-field="push"> 扫描后推送</label>
+      <label class="cfg-check"><input type="checkbox" data-field="refresh_dashboard"> 扫描后刷新看板</label>
+      <div class="cfg-ops">
+        <button type="button" class="cfg-save" data-section="schedule">保存</button>
+        <button type="button" class="cfg-reset ghost" data-section="schedule">恢复默认</button>
+      </div>
+    </form>
+
+    <div class="cfg-msg" id="cfg-msg"></div>
+    <div class="muted cfg-note" id="cfg-static-note" style="display:none;">
+      静态模式为只读；运行 prober serve 后可在本页修改配置
+    </div>
+  </details>
+
+  <div class="disclaimer">
+    ⚠️ 免责声明：本工具仅辅助研判，不构成投资建议，不荐股、不自动交易。
+    数据由系统基于公开数据自动归集，缺失项已在页首如实列出，不做任何估算填充。
+  </div>
+
+  <div class="foot">生成时间：<span id="gen-time">—</span> ｜ 大盘看板 {{ meta.date_text }}</div>
+</div>
+
+<button class="topbtn" onclick="window.scrollTo({top:0,behavior:'smooth'})">回到顶部</button>
+<script>
+  try { document.getElementById('gen-time').textContent = new Date().toLocaleString(); } catch (e) {}
+</script>
+<script>
+/* 监控列表交互（无框架、无外链）：
+   - 仅当页面以 prober serve 打开（fetch 同源 /api/watchlist 成功）才启用交互；
+   - fetch 失败（file:// 静态打开）则降级为只读，保留服务端渲染的静态列表。 */
+(function () {
+  'use strict';
+  var API = '/api/watchlist';
+  var listEl = document.getElementById('wl-list');
+  if (!listEl) { return; }
+  var addBar = document.getElementById('wl-add-bar');
+  var input = document.getElementById('wl-input');
+  var addBtn = document.getElementById('wl-add-btn');
+  var msgEl = document.getElementById('wl-msg');
+  var candsEl = document.getElementById('wl-cands');
+  var emptyEl = document.getElementById('wl-empty');
+  var noteEl = document.getElementById('wl-static-note');
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function say(text) { if (msgEl) { msgEl.textContent = text || ''; } }
+
+  function renderRows(items) {
+    if (!items.length) {
+      listEl.innerHTML = '';
+      if (emptyEl) { emptyEl.style.display = ''; }
+      return;
+    }
+    if (emptyEl) { emptyEl.style.display = 'none'; }
+    listEl.innerHTML = items.map(function (it) {
+      var badge = it.active
+        ? '<span class="badge up">监控中</span>'
+        : '<span class="badge neutral">已暂停</span>';
+      var ops =
+        '<button class="wl-btn" data-op="toggle" data-code="' + esc(it.code) + '" data-active="' + (it.active ? '1' : '0') + '">' + (it.active ? '暂停' : '恢复') + '</button>' +
+        '<button class="wl-btn danger" data-op="remove" data-code="' + esc(it.code) + '">删除</button>';
+      return '<li data-code="' + esc(it.code) + '"><div class="wl-line">' +
+        '<span><span class="tag">' + esc(it.code) + '</span>' + esc(it.name || it.code) + ' ' + badge + '</span>' +
+        '<span class="wl-ops">' + ops + '</span></div></li>';
+    }).join('');
+  }
+
+  function renderCandidates(cands) {
+    if (!candsEl) { return; }
+    candsEl.innerHTML = (cands || []).map(function (c) {
+      return '<button class="wl-cand" data-code="' + esc(c.code) + '">' +
+        esc(c.name || c.code) + ' ' + esc(c.code) + '</button>';
+    }).join('');
+  }
+
+  function postJson(url, body, done) {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (resp) {
+      return resp.json().then(function (json) { return { status: resp.status, json: json }; });
+    }).then(done).catch(function (err) { say('请求失败：' + err); });
+  }
+
+  function refresh() {
+    fetch(API).then(function (r) { return r.json(); }).then(function (j) {
+      renderRows((j && j.items) || []);
+    }).catch(function () { say('刷新监控列表失败'); });
+  }
+
+  listEl.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('button[data-op]') : null;
+    if (!btn) { return; }
+    var code = btn.getAttribute('data-code');
+    var op = btn.getAttribute('data-op');
+    if (op === 'remove') {
+      postJson('/api/watchlist/remove', { code: code }, function (res) {
+        if (res.json && res.json.ok) { say(''); refresh(); }
+        else { say((res.json && res.json.error) || '删除失败'); }
+      });
+    } else if (op === 'toggle') {
+      postJson('/api/watchlist/active',
+        { code: code, active: btn.getAttribute('data-active') !== '1' },
+        function (res) {
+          if (res.json && res.json.ok) { say(''); refresh(); }
+          else { say((res.json && res.json.error) || '操作失败'); }
+        });
+    }
+  });
+
+  if (candsEl) {
+    candsEl.addEventListener('click', function (ev) {
+      var btn = ev.target.closest ? ev.target.closest('.wl-cand') : null;
+      if (!btn) { return; }
+      renderCandidates([]);
+      postJson('/api/watchlist/add', { query: btn.getAttribute('data-code') }, function (res) {
+        if (res.json && res.json.ok) {
+          say(''); if (input) { input.value = ''; } refresh();
+        } else { say((res.json && res.json.error) || '添加失败'); }
+      });
+    });
+  }
+
+  function submitAdd() {
+    var query = input ? input.value.trim() : '';
+    if (!query) { say('请输入名称 / 简称 / 代码'); return; }
+    say('解析中…');
+    postJson('/api/watchlist/add', { query: query }, function (res) {
+      if (res.json && res.json.ok) {
+        say(''); if (input) { input.value = ''; } renderCandidates([]); refresh();
+      } else if (res.status === 409 && res.json && res.json.candidates) {
+        say('匹配到多个标的，请点选：');
+        renderCandidates(res.json.candidates);
+      } else {
+        say((res.json && res.json.error) || '添加失败');
+      }
+    });
+  }
+  if (addBtn) { addBtn.addEventListener('click', submitAdd); }
+  if (input) {
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { submitAdd(); }
+    });
+  }
+
+  // 模式探测：同源 /api/watchlist 可达 → 交互模式；否则静态只读降级。
+  fetch(API).then(function (resp) {
+    if (!resp.ok) { throw new Error('bad status'); }
+    return resp.json();
+  }).then(function (j) {
+    if (addBar) { addBar.style.display = 'flex'; }
+    if (noteEl) { noteEl.style.display = 'none'; }
+    say('');
+    renderRows((j && j.items) || []);
+  }).catch(function () {
+    if (addBar) { addBar.style.display = 'none'; }
+    if (noteEl) { noteEl.style.display = ''; }
+    renderCandidates([]);
+  });
+})();
+</script>
+<script>
+/* 设置卡片交互（无框架、无外链）：
+   - prober serve 模式：fetch /api/settings 成功 → 隐藏静态摘要、显示表单并回填
+     生效值；秘密字段只显示脱敏占位（明文永不回传）；
+   - file:// 静态打开：fetch 失败 → 隐藏表单，保留只读摘要与降级提示。 */
+(function () {
+  'use strict';
+  var API = '/api/settings';
+  var card = document.getElementById('cfg-card');
+  if (!card) { return; }
+  var forms = {
+    llm: document.getElementById('cfg-form-llm'),
+    push: document.getElementById('cfg-form-push'),
+    schedule: document.getElementById('cfg-form-schedule')
+  };
+  var msgEl = document.getElementById('cfg-msg');
+  var staticEl = document.getElementById('cfg-static');
+  var noteEl = document.getElementById('cfg-static-note');
+
+  function say(text) { if (msgEl) { msgEl.textContent = text || ''; } }
+
+  function postJson(url, body, done) {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (resp) {
+      return resp.json().then(function (json) { return { status: resp.status, json: json }; });
+    }).then(done).catch(function (err) { say('请求失败：' + err); });
+  }
+
+  /* 把 GET /api/settings 的 sections 回填进三段表单：
+     秘密字段（data-secret="1"）清空输入框，用脱敏值做占位符。 */
+  function backfill(sections) {
+    Object.keys(forms).forEach(function (sec) {
+      var form = forms[sec];
+      if (!form) { return; }
+      var vals = (sections && sections[sec]) || {};
+      var nodes = form.querySelectorAll('input[data-field]');
+      for (var i = 0; i < nodes.length; i++) {
+        var inp = nodes[i];
+        var field = inp.getAttribute('data-field');
+        if (inp.type === 'checkbox') { inp.checked = !!vals[field]; continue; }
+        if (inp.getAttribute('data-secret') === '1') {
+          var masked = (vals[field] && typeof vals[field] === 'object') ? (vals[field].masked || '') : '';
+          inp.value = '';
+          inp.placeholder = masked || '未配置';
+          continue;
+        }
+        inp.value = vals[field] == null ? '' : String(vals[field]);
+      }
+    });
+  }
+
+  function enterInteractive(sections) {
+    if (staticEl) { staticEl.style.display = 'none'; }
+    if (noteEl) { noteEl.style.display = 'none'; }
+    Object.keys(forms).forEach(function (sec) {
+      if (forms[sec]) { forms[sec].style.display = 'block'; }
+    });
+    backfill(sections);
+  }
+
+  function enterStaticMode() {
+    if (noteEl) { noteEl.style.display = ''; }
+  }
+
+  /* 收集单段表单：checkbox → 布尔；秘密字段留空 = 不修改（不覆盖已存明文）。 */
+  function collectSection(form) {
+    var data = {};
+    var nodes = form.querySelectorAll('input[data-field]');
+    for (var i = 0; i < nodes.length; i++) {
+      var inp = nodes[i];
+      var field = inp.getAttribute('data-field');
+      if (inp.type === 'checkbox') { data[field] = inp.checked; continue; }
+      var v = inp.value.trim();
+      if (inp.getAttribute('data-secret') === '1') {
+        if (v !== '') { data[field] = v; }
+        continue;
+      }
+      if (inp.getAttribute('data-type') === 'number') {
+        // 数值字段（如 temperature）：转成数字提交；留空 = 不修改。
+        if (v !== '') { var n = Number(v); if (!isNaN(n)) { data[field] = n; } }
+        continue;
+      }
+      data[field] = v;
+    }
+    return data;
+  }
+
+  function saveSection(section) {
+    var form = forms[section];
+    if (!form) { return; }
+    var payload = {};
+    payload[section] = collectSection(form);
+    say('保存中…');
+    postJson(API, payload, function (res) {
+      if (res.json && res.json.ok) {
+        say('已保存：' + ((res.json.saved || []).join('、') || section) + '，改完即生效');
+      } else {
+        var failed = (res.json && res.json.failed) || {};
+        var parts = Object.keys(failed).map(function (k) {
+          return k + '：' + (failed[k] || []).join('；');
+        });
+        say('保存失败 — ' + (parts.join(' ｜ ') || (res.json && res.json.error) || '未知错误'));
+      }
+    });
+  }
+
+  function resetSection(section) {
+    if (!window.confirm('恢复默认将清除「' + section + '」的页面覆盖配置，确定？')) { return; }
+    say('恢复中…');
+    postJson(API + '/reset', { section: section }, function (res) {
+      if (res.json && res.json.ok) {
+        say('已恢复默认：' + section);
+        fetch(API).then(function (r) { return r.json(); }).then(function (j) {
+          backfill((j && j.sections) || {});
+        }).catch(function () { say('刷新配置失败，请重新展开设置'); });
+      } else {
+        say('恢复失败：' + ((res.json && res.json.error) || '未知错误'));
+      }
+    });
+  }
+
+  card.addEventListener('click', function (ev) {
+    var btn = ev.target.closest ? ev.target.closest('button[data-section]') : null;
+    if (!btn) { return; }
+    var sec = btn.getAttribute('data-section');
+    if (btn.classList.contains('cfg-save')) { saveSection(sec); }
+    else if (btn.classList.contains('cfg-reset')) { resetSection(sec); }
+  });
+
+  // 模式探测：同源 /api/settings 可达 → 交互模式；否则静态只读降级。
+  fetch(API).then(function (resp) {
+    if (!resp.ok) { throw new Error('bad status'); }
+    return resp.json();
+  }).then(function (j) {
+    enterInteractive((j && j.sections) || {});
+  }).catch(function () {
+    enterStaticMode();
+  });
+})();
+</script>
+</body>
+</html>

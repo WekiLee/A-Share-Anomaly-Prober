@@ -1,0 +1,25 @@
+# ashare-anomaly-prober 精确版本锁定（2026-10-02，受管 venv 实测通过：379 passed / 2 skipped）
+# 用途：可复现部署。安装：pip install -r requirements.lock.txt
+#
+# ⚠️ akshare 锁定纪律：
+#   - akshare 函数名随版本剧烈变动（1.18.84 实证：stock_dt_pool_em / stock_us_spot_em 等
+#     均不存在，跌停池实际名 stock_zt_pool_dtgc_em，美股指数用 index_global_spot_em）。
+#   - 凭训练记忆或旧文档猜函数名必错；任何升级前先用 dir(ak) 实测核实候选函数链。
+#   - 升级检查清单见 README「版本锁定与升级注意事项」。
+akshare==1.18.84
+httpx==0.28.1
+openai==3.22.1
+pydantic==2.13.5
+pydantic-settings==2.15.0
+apscheduler==3.11.3
+jinja2==3.1.6
+typer==0.27.2
+rich==15.0.0
+structlog==26.1.0
+duckdb==1.5.6
+# --- akshare 重传递依赖（大版本常伴随 API 破坏，一并锁定） ---
+pandas==3.0.5
+numpy==2.5.2
+beautifulsoup4==4.15.0
+lxml==6.1.1
+requests==2.34.2
